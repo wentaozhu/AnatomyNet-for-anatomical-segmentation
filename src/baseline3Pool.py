@@ -4,25 +4,25 @@
 # In[1]:
 
 
-#import matplotlib
-#matplotlib.use('Agg')
-#get_ipython().magic(u'matplotlib inline')
-#import matplotlib.pyplot as plt
-#plt.rcParams['image.cmap'] = 'gray' 
+# import matplotlib
+# matplotlib.use('Agg')
+# get_ipython().magic(u'matplotlib inline')
+# import matplotlib.pyplot as plt
+# plt.rcParams['image.cmap'] = 'gray' 
 from glob import glob
 import SimpleITK as sitk
 SMALL_SIZE = 14
 MEDIUM_SIZE = 16
 BIGGER_SIZE = 18
-#plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-#plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-#plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-#plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-#plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-#plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-#plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-#from ipywidgets import interact, interactive
-#from ipywidgets import widgets
+# plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+# plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+# plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+# plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+# plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+# from ipywidgets import interact, interactive
+# from ipywidgets import widgets
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
 import cv2
@@ -35,12 +35,11 @@ import torch as t
 t.backends.cudnn.enabled = True
 from torch.utils import data
 from torchvision import transforms as tsf
-
-TRAIN_PATH = './data/trainpddca15_crp_v2_pool1.pth'
-TEST_PATH = './data/testpddca15_crp_v2_pool1.pth'
-CET_PATH = './data/trainpddca15_cet_crp_v2_pool1.pth'
-PET_PATH = './data/trainpddca15_pet_crp_v2_pool1.pth'
-os.environ["CUDA_VISIBLE_DEVICES"]="7"
+TRAIN_PATH = './data/trainpddca15_crp_v2_pool3.pth'
+TEST_PATH = './data/testpddca15_crp_v2_pool3.pth'
+CET_PATH = './data/trainpddca15_cet_crp_v2_pool3.pth'
+PET_PATH = './data/trainpddca15_pet_crp_v2_pool3.pth'
+os.environ["CUDA_VISIBLE_DEVICES"]="4"
 
 
 # In[2]:
@@ -94,9 +93,6 @@ def getdatamask(data, mask_data, debug=False): # read data and mask, reshape
         item = {}
         img = np.load(fnm) # z y x
         nz, ny, nx = img.shape
-#         if nz > 300 or ny > 300 or nx > 300: 
-#             print(fnm, nx, ny, nz)
-#             assert 1==0
         tnz, tny, tnx = math.ceil(nz/8.)*8., math.ceil(ny/8.)*8., math.ceil(nx/8.)*8.
         img = imfit(img, int(tnz), int(tny), int(tnx)) #zoom(img, (tnz/nz,tny/ny,tnx/nx), order=2, mode='nearest')
         item['img'] = t.from_numpy(img)
@@ -113,7 +109,7 @@ def getdatamask(data, mask_data, debug=False): # read data and mask, reshape
         item['name'] = str(fnm)#.split('/')[-1]
         datas.append(item)
     return datas
-def process(path='/data/wtzhu/dataset/pddca18/pddca18/', debug=False):
+def process(path='/data/wtzhu/dataset/pddca18/', debug=False):
     trfnmlst, trfnmlstopt, tefnmlstoff, tefnmlst = [], [], [], [] # get train and test files
     train_files, train_filesopt, test_filesoff, test_files = [], [], [], [] # MICCAI15 and MICCAI16 use different test
     for pid in os.listdir(path):
@@ -267,22 +263,10 @@ class DatasetStg1():
                 new_img2[i,:,:,j] = map_coordinates(new_img[i,:,:,j], indices, order=0, mode='constant').reshape(shape[1:-1])
         return np.array(new_img2), new_img
 traindataset = DatasetStg1(PET_PATH, istranform=True)
-traindataloader = t.utils.data.DataLoader(traindataset,num_workers=10,batch_size=1, shuffle=True)
+traindataloader = t.utils.data.DataLoader(traindataset,num_workers=8,batch_size=1, shuffle=True)
 testdataset = DatasetStg1(TEST_PATH, istranform=False)
-testdataloader = t.utils.data.DataLoader(testdataset,num_workers=10,batch_size=1)
+testdataloader = t.utils.data.DataLoader(testdataset,num_workers=5,batch_size=1)
 print(len(traindataloader), len(testdataloader))
-img, mask, retflag = traindataset[1]
-print(img.size(), mask.size(), retflag)
-# myshow3d(sitk.GetImageFromArray(img.numpy().squeeze()))
-# fig = plt.figure()
-# maskdata = (np.argmax(mask.numpy().squeeze(), axis=0).astype(np.uint8))
-# print(maskdata.min(), maskdata.max())
-# myshow3d(sitk.GetImageFromArray(maskdata)) #mask.numpy()[2,:,:,:].squeeze())) # [:,3,:,:,:]
-# fig = plt.figure()
-# myshow3d(sitk.GetImageFromArray(mask.numpy().squeeze()[0,:,:,:]))
-# fig = plt.figure()
-# myshow3d(sitk.GetImageFromArray(mask.numpy().squeeze()[1,:,:,:]))
-# fig = plt.figure()
 
 
 # In[4]:
@@ -369,14 +353,14 @@ class UNet(nn.Module):
     def __init__(self, n_channels, n_classes):
         super(UNet, self).__init__()
 #         self.inc = inconv(n_channels, 64)
-        self.down1 = down(n_channels, 32, 2) # 1/2
-        self.down2 = down(32, 40, 1) # 1/2
-        self.down3 = down(40, 48, 1) # 1/2
-        self.down4 = down(48, 56, 1)
-        self.up1 = up(104, 48, stride=1) 
-        self.up2 = up(88, 40, stride=1) # 1/2
-        self.up3 = up(72, 32, stride=1) # 1/2
-        self.up4 = up(32, 16, 17, 16, 16, n_classes, bias=True) # 1
+        self.down1 = down(n_channels, 64, 2) # 1/2
+        self.down2 = down(64, 128, 2) # 1/4
+        self.down3 = down(128, 256, 2) # 1/8
+        self.down4 = down(256, 288, 1)
+        self.up1 = up(544, 256, stride=1) # 1/8
+        self.up2 = up(256, 128) # 1/4
+        self.up3 = up(128, 64) # 1/2
+        self.up4 = up(64, 32, 33, 32, 32, n_classes, bias=True) # 1
 #         self.outc = outconv(12, n_classes)
     def forward(self, x):
 #         x1 = self.inc(x)
@@ -425,51 +409,6 @@ def tversky_loss_wmask(y_pred, y_true, flagvec):
 #     Ncl = y_pred.size(1)*1.0
 #     print(Ncl, T)
     return t.sum(flagvec.cuda())-T
-
-def generaldiceloss_wmask(y_pred, y_true, flagvec): # (torch.Size([1, 10, 104, 152, 120]), torch.Size([1, 10, 104, 152, 120]))
-    # MLMI17 Generalised Dice overlap as a deep learning loss function for highly unbalanced segmentations
-#     print(y_pred.size(), y_true.size())
-    batch_size = y_true.size(0)
-    ncls = y_true.size(1)#.type(t.cuda.FloatTensor)
-#     output = y_pred.view(-1, ncls)
-#     labels = y_true.view(-1, ncls)
-    rp = t.sum(t.sum(t.sum(t.sum(y_pred * y_true.type(t.cuda.FloatTensor),4),3),2),0) # cls
-    wl = t.sum(t.sum(t.sum(t.sum(y_true.type(t.cuda.FloatTensor),4),3),2),0) # cls
-    wl = 1.0 / (wl * wl + 1e-5)
-    r_p = t.sum(t.sum(t.sum(t.sum(y_pred + y_true.type(t.cuda.FloatTensor),4),3),2),0) # cls
-    return 1 - 2 * t.sum(wl * rp* flagvec.cuda()) / t.sum(wl * r_p + 1e-5)
-
-def fdl_loss_wmask(y_pred, y_true, flagvec):
-    alpha = 0.5
-    beta  = 0.5
-    ones = t.ones_like(y_pred) #K.ones(K.shape(y_true))
-#     print(type(ones.data), type(y_true.data), type(y_pred.data), ones.size(), y_pred.size())
-    p0 = y_pred      # proba that voxels are class i
-    p1 = ones-y_pred # proba that voxels are not class i
-    g0 = y_true.type(t.cuda.FloatTensor)
-    g1 = ones-g0
-    num = t.sum(t.sum(t.sum(t.sum(p0*g0*t.pow(1-p0,2), 4),3),2),0) #(0,2,3,4)) #K.sum(p0*g0, (0,1,2,3))
-    den = num + alpha*t.sum(t.sum(t.sum(t.sum(p0*g1,4),3),2),0) + beta*t.sum(t.sum(t.sum(t.sum(p1*g0,4),3),2),0) #(0,2,3,4))
-
-    T = t.sum(((num * flagvec.cuda())/(den+1e-5)))# * t.pow(1-num/(t.sum(t.sum(t.sum(t.sum(g0,4),3),2),0)+1e-5),2))
-#     Ncl = y_pred.size(1)*1.0
-#     print(Ncl, T)
-    return 1.6 * (t.sum(flagvec.cuda())- T) #Ncl-T
-
-def explogdice_wmask(y_pred, y_true, flagvec):
-    alpha = 0.5
-    beta  = 0.5
-    ones = t.ones_like(y_pred) #K.ones(K.shape(y_true))
-#     print(type(ones.data), type(y_true.data), type(y_pred.data), ones.size(), y_pred.size())
-    p0 = y_pred      # proba that voxels are class i
-    p1 = ones-y_pred # proba that voxels are not class i
-    g0 = y_true.type(t.cuda.FloatTensor)
-    g1 = ones-g0
-    num = t.sum(t.sum(t.sum(t.sum(p0*g0, 4),3),2),0) #(0,2,3,4)) #K.sum(p0*g0, (0,1,2,3))
-    den = num + alpha*t.sum(t.sum(t.sum(t.sum(p0*g1,4),3),2),0) + beta*t.sum(t.sum(t.sum(t.sum(p1*g0,4),3),2),0)
-    return t.sum(t.pow(-t.log(t.clamp(num/(den+1e-5), 1e-5, 1-1e-5)), 0.3) * flagvec.cuda()) / (t.clamp(t.sum(flagvec.cuda()), 1e-5, 1000))
-#     return t.sum(t.pow(-t.log(t.clamp(num/denom, 1e-5, 1)), 0.3) * flagvec.cuda())/(t.clamp(t.sum((flagvec.cuda()!=0)), 1e-5, 1000)).type(t.cuda.FloatTensor)
-
 def caldice(y_pred, y_true):
 #     print(y_pred.sum(), y_true.sum())
     y_pred = y_pred.data.cpu().numpy().transpose(1,0,2,3,4) # inference should be arg max
@@ -526,7 +465,7 @@ def caldice(y_pred, y_true):
     return avgdice
 model = UNet(1,9+1).cuda()
 lossweight = np.array([2.22, 1.31, 1.99, 1.13, 1.93, 1.93, 1.0, 1.0, 1.90, 1.98], np.float32)
-savename = './model/unet10pool1e2e_pet_wmask_rmsp_'
+savename = './model/unet10pool3e2e_pet_wmask_rmsp_'
 
 
 # In[5]:
@@ -538,7 +477,6 @@ for epoch in range(150):
     tq = tqdm(traindataloader, desc='loss', leave=True)
     trainloss = 0
     for x_train, y_train, flagvec in tq:
-#         print(x_train.size(), y_train.size(), flagvec.size())
         x_train = t.autograd.Variable(x_train.cuda())
         y_train = t.autograd.Variable(y_train.cuda())
         optimizer.zero_grad()
@@ -591,7 +529,7 @@ for epoch in range(150):
         print('train loss %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f' % tuple(testloss))
 
 
-# In[ ]:
+# In[6]:
 
 
 optimizer = t.optim.SGD(model.parameters(), 1e-3, momentum = 0.9)#, weight_decay = 1e-4)

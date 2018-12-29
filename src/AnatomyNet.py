@@ -4,25 +4,25 @@
 # In[1]:
 
 
-#import matplotlib
-#matplotlib.use('Agg')
-#get_ipython().magic(u'matplotlib inline')
-#import matplotlib.pyplot as plt
-#plt.rcParams['image.cmap'] = 'gray' 
+# import matplotlib
+# matplotlib.use('Agg')
+# get_ipython().magic(u'matplotlib inline')
+# import matplotlib.pyplot as plt
+# plt.rcParams['image.cmap'] = 'gray' 
 from glob import glob
 import SimpleITK as sitk
 SMALL_SIZE = 14
 MEDIUM_SIZE = 16
 BIGGER_SIZE = 18
-#plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
-#plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
-#plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
-#plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-#plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
-#plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
-#plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
-#from ipywidgets import interact, interactive
-#from ipywidgets import widgets
+# plt.rc('font', size=SMALL_SIZE)          # controls default text sizes
+# plt.rc('axes', titlesize=SMALL_SIZE)     # fontsize of the axes title
+# plt.rc('axes', labelsize=MEDIUM_SIZE)    # fontsize of the x and y labels
+# plt.rc('xtick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('ytick', labelsize=SMALL_SIZE)    # fontsize of the tick labels
+# plt.rc('legend', fontsize=SMALL_SIZE)    # legend fontsize
+# plt.rc('figure', titlesize=BIGGER_SIZE)  # fontsize of the figure title
+# from ipywidgets import interact, interactive
+# from ipywidgets import widgets
 from scipy.ndimage.interpolation import map_coordinates
 from scipy.ndimage.filters import gaussian_filter
 import cv2
@@ -41,6 +41,7 @@ TEST_PATH = './data/testpddca15_crp_v2_pool1.pth'
 CET_PATH = './data/trainpddca15_cet_crp_v2_pool1.pth'
 PET_PATH = './data/trainpddca15_pet_crp_v2_pool1.pth'
 os.environ["CUDA_VISIBLE_DEVICES"]="7"
+
 
 
 # In[2]:
@@ -94,9 +95,6 @@ def getdatamask(data, mask_data, debug=False): # read data and mask, reshape
         item = {}
         img = np.load(fnm) # z y x
         nz, ny, nx = img.shape
-#         if nz > 300 or ny > 300 or nx > 300: 
-#             print(fnm, nx, ny, nz)
-#             assert 1==0
         tnz, tny, tnx = math.ceil(nz/8.)*8., math.ceil(ny/8.)*8., math.ceil(nx/8.)*8.
         img = imfit(img, int(tnz), int(tny), int(tnx)) #zoom(img, (tnz/nz,tny/ny,tnx/nx), order=2, mode='nearest')
         item['img'] = t.from_numpy(img)
@@ -113,7 +111,7 @@ def getdatamask(data, mask_data, debug=False): # read data and mask, reshape
         item['name'] = str(fnm)#.split('/')[-1]
         datas.append(item)
     return datas
-def process(path='/data/wtzhu/dataset/pddca18/pddca18/', debug=False):
+def process(path='/data/wtzhu/dataset/pddca18/', debug=False):
     trfnmlst, trfnmlstopt, tefnmlstoff, tefnmlst = [], [], [], [] # get train and test files
     train_files, train_filesopt, test_filesoff, test_files = [], [], [], [] # MICCAI15 and MICCAI16 use different test
     for pid in os.listdir(path):
@@ -271,18 +269,6 @@ traindataloader = t.utils.data.DataLoader(traindataset,num_workers=10,batch_size
 testdataset = DatasetStg1(TEST_PATH, istranform=False)
 testdataloader = t.utils.data.DataLoader(testdataset,num_workers=10,batch_size=1)
 print(len(traindataloader), len(testdataloader))
-img, mask, retflag = traindataset[1]
-print(img.size(), mask.size(), retflag)
-# myshow3d(sitk.GetImageFromArray(img.numpy().squeeze()))
-# fig = plt.figure()
-# maskdata = (np.argmax(mask.numpy().squeeze(), axis=0).astype(np.uint8))
-# print(maskdata.min(), maskdata.max())
-# myshow3d(sitk.GetImageFromArray(maskdata)) #mask.numpy()[2,:,:,:].squeeze())) # [:,3,:,:,:]
-# fig = plt.figure()
-# myshow3d(sitk.GetImageFromArray(mask.numpy().squeeze()[0,:,:,:]))
-# fig = plt.figure()
-# myshow3d(sitk.GetImageFromArray(mask.numpy().squeeze()[1,:,:,:]))
-# fig = plt.figure()
 
 
 # In[4]:
@@ -292,116 +278,228 @@ print(img.size(), mask.size(), retflag)
 from torch import nn
 import torch.nn.functional as F
 from scipy.spatial.distance import dice
-class double_conv(nn.Module):
-    '''(conv => BN => ReLU) * 2'''
-    def __init__(self, in_ch, out_ch, in_ch2=None, out_ch2=None, stride=2, bias=False):
-        super(double_conv, self).__init__()
-        if in_ch2 is None: in_ch2, out_ch2 = in_ch, out_ch
-        if bias:
-            self.conv = nn.Sequential(
-                nn.Conv3d(in_ch, out_ch, 3, padding=1, stride=stride, bias=True),
-                nn.BatchNorm3d(out_ch),
-                nn.ReLU(inplace=True),
-                nn.Conv3d(in_ch2, out_ch2, 3, padding=1, bias=True),
-            )
+def conv3x3x3(in_planes, out_planes, stride=1):
+    "3x3x3 convolution with padding"
+    return nn.Conv3d(in_planes, out_planes, kernel_size=3, stride=stride,
+                     padding=1, bias=False)
+class BasicBlock3D(nn.Module):
+    def __init__(self, inplanes, planes, stride=1):
+        super(BasicBlock3D, self).__init__()
+        self.conv1 = conv3x3x3(inplanes, planes, stride)
+        self.bn1 = nn.BatchNorm3d(planes)
+        self.relu = nn.LeakyReLU(inplace=True)
+        self.conv2 = conv3x3x3(planes, planes)
+        self.bn2 = nn.BatchNorm3d(planes)
+        if inplanes != planes:
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes, planes, kernel_size=1, stride=stride, bias=False),
+                                            nn.BatchNorm3d(planes))
         else:
-            self.conv = nn.Sequential(
-                nn.Conv3d(in_ch, out_ch, 3, padding=1, stride=stride, bias=False),
-                nn.BatchNorm3d(out_ch),
-                nn.ReLU(inplace=True),
-                nn.Conv3d(out_ch2, out_ch2, 3, padding=1, bias=False),
-                nn.BatchNorm3d(out_ch),
-                nn.ReLU(inplace=True)
-            )
+            self.downsample = lambda x: x
+        self.stride = stride       
     def forward(self, x):
-        x = self.conv(x)
-        return x
-class inconv(nn.Module):
-    def __init__(self, in_ch, out_ch):
-        super(inconv, self).__init__()
-        self.conv = double_conv(in_ch, out_ch)
-    def forward(self, x):
-        x = self.conv(x)
-        return x
-class down(nn.Module):
-    def __init__(self, in_ch, out_ch, stride=2):
-        super(down, self).__init__()
-        self.mpconv = nn.Sequential(
-#             nn.MaxPool3d(2),
-            double_conv(in_ch, out_ch, stride=stride)
-        )
-    def forward(self, x):
-        x = self.mpconv(x)
-        return x
-class up(nn.Module):
-    def __init__(self, in_ch, out_ch, in_ch2=None, out_ch2=None, in_ch3=None, out_ch3=None,                  bilinear=False, bias=False, stride=2):
-        super(up, self).__init__()
-        #  would be a nice idea if the upsampling could be learned too,
-        #  but my machine do not have enough memory to handle all those weights
-        if in_ch2 == None:
-            in_ch2, out_ch2 = in_ch, out_ch
-        if in_ch3 == None:
-            in_ch3, out_ch3 = in_ch2, out_ch2
-        if bilinear:
-            self.up = nn.Upsample(scale_factor=2)
-        elif stride==2:
-            self.up = nn.ConvTranspose3d(in_ch, out_ch, 2, stride=stride)
-        self.stride = stride
-        self.conv = double_conv(in_ch2, out_ch2, in_ch3, out_ch3, stride=1, bias=bias)
-    def forward(self, x1, x2):
-        if self.stride == 2:
-            x1 = self.up(x1)
-        diffX = x1.size()[2] - x2.size()[2]
-        diffY = x1.size()[3] - x2.size()[3]
-        x2 = F.pad(x2, (diffX // 2, int(diffX / 2),
-                        diffY // 2, int(diffY / 2)))
-        x = t.cat([x2, x1], dim=1)
-        x = self.conv(x)
-        return x
-class outconv(nn.Module):
-    def __init__(self, in_ch, out_ch):
-        super(outconv, self).__init__()
-        self.conv = nn.Conv3d(in_ch, out_ch, 1)
-    def forward(self, x):
-        x = self.conv(x)
-        return x
-class UNet(nn.Module):
-    def __init__(self, n_channels, n_classes):
-        super(UNet, self).__init__()
-#         self.inc = inconv(n_channels, 64)
-        self.down1 = down(n_channels, 32, 2) # 1/2
-        self.down2 = down(32, 40, 1) # 1/2
-        self.down3 = down(40, 48, 1) # 1/2
-        self.down4 = down(48, 56, 1)
-        self.up1 = up(104, 48, stride=1) 
-        self.up2 = up(88, 40, stride=1) # 1/2
-        self.up3 = up(72, 32, stride=1) # 1/2
-        self.up4 = up(32, 16, 17, 16, 16, n_classes, bias=True) # 1
-#         self.outc = outconv(12, n_classes)
-    def forward(self, x):
-#         x1 = self.inc(x)
 #         print(x.size())
-        x2 = self.down1(x) # 1/2
-#         print(x2.size())
-        x3 = self.down2(x2) # 1/4
-#         print(x3.size())
-        x4 = self.down3(x3) # 1/8
-#         print(x4.size())
-        x5 = self.down4(x4) # 1/8
-#         print(x5.size())
-        outx = self.up1(x5, x4) # 1/8
-#         print(x5.size(), x4.size(), outx.size())
-        outx = self.up2(outx, x3) # 1/4
-#         print(x3.size(), outx.size())
-        outx = self.up3(outx, x2) # 1/2
-#         print(x2.size(), outx.size())
-        outx = self.up4(outx, x) # 1
-#         print(x.size(), outx.size())
-#         outx = self.outc(outx)
-#         print(outx.size())
-        outx = F.softmax(outx, dim=1)
-#         print(outx.size())
-        return outx
+        residual = self.downsample(x)
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+#         print(x.size(), residual.size(), out.size())
+        out += residual
+        out = self.relu(out)
+        return out
+def Deconv3x3x3(in_planes, out_planes, stride=2):
+    "3x3x3 deconvolution with padding"
+    return nn.ConvTranspose3d(in_planes, out_planes, kernel_size=2, stride=stride)
+
+class SELayer3D(nn.Module):
+    def __init__(self, channel, reduction=15):
+        super(SELayer3D, self).__init__()
+        self.avg_pool = nn.AdaptiveAvgPool3d(1)
+        self.fc = nn.Sequential(
+                nn.Linear(channel, channel // reduction),
+                nn.LeakyReLU(inplace=True),
+                nn.Linear(channel // reduction, channel),
+                nn.Sigmoid())
+    def forward(self, x):
+        b, c, _, _, _ = x.size()
+        y = self.avg_pool(x).view(b, c)
+        y = self.fc(y).view(b, c, 1, 1, 1)
+        return x * y
+class SEBasicBlock3D(nn.Module):
+    expansion = 1
+    def __init__(self, inplanes, planes, stride=1, downsample=None, reduction=15):
+        super(SEBasicBlock3D, self).__init__()
+        self.conv1 = conv3x3x3(inplanes, planes, stride)
+        self.bn1 = nn.BatchNorm3d(planes)
+        self.relu = nn.LeakyReLU(inplace=True)
+        self.conv2 = conv3x3x3(planes, planes, 1)
+        self.bn2 = nn.BatchNorm3d(planes)
+        self.se = SELayer3D(planes, reduction)
+        if inplanes != planes:
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes, planes, kernel_size=1, stride=stride, bias=False),
+                                            nn.BatchNorm3d(planes))
+        else:
+            self.downsample = lambda x: x
+        self.stride = stride
+    def forward(self, x):
+        residual = x
+        out = self.conv1(x)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.se(out)
+#         if self.downsample is not None:
+        residual = self.downsample(x)
+        out += residual
+        out = self.relu(out)
+        return out
+class UpSEBasicBlock3D(nn.Module):
+    def __init__(self, inplanes1, inplanes2, planes, stride=1, downsample=None, reduction=16):
+        super(UpSEBasicBlock3D, self).__init__()
+        inplanes3 = inplanes1 + inplanes2
+        if stride == 2:
+            self.deconv1 = Deconv3x3x3(inplanes1, inplanes1//2)
+            inplanes3 = inplanes1 // 2 + inplanes2
+        self.stride = stride
+        # self.conv1x1x1 = nn.Conv3d(inplanes2, planes, kernel_size=1, stride=1)#, padding=1)
+        self.conv1 = conv3x3x3(inplanes3, planes)#, stride)
+        self.bn1 = nn.BatchNorm3d(planes)
+        self.relu = nn.LeakyReLU(inplace=True)
+        self.conv2 = conv3x3x3(planes, planes)
+        self.bn2 = nn.BatchNorm3d(planes)
+        self.se = SELayer3D(planes, reduction)
+        if inplanes3 != planes:
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes3, planes, kernel_size=1, stride=stride, bias=False),
+                                            nn.BatchNorm3d(planes))
+        else:
+            self.downsample = lambda x: x
+        self.stride = stride
+    def forward(self, x1, x2):
+#         print(x1.size(), x2.size())
+        if self.stride == 2: x1 = self.deconv1(x1)
+        # x2 = self.conv1x1x1(x2)
+        #print(x1.size(), x2.size())
+        out = t.cat([x1, x2], dim=1) #x1 + x2
+        residual = self.downsample(out)
+        #print(residual.size(), x1.size(), x2.size())
+        out = self.conv1(out)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+        out = self.se(out)
+        #print(out.size(), residual.size())
+        out += residual
+        out = self.relu(out)
+        return out
+class UpBasicBlock3D(nn.Module):
+    def __init__(self, inplanes1, inplanes2, planes, stride=2):
+        super(UpBasicBlock3D, self).__init__()
+        inplanes3 = inplanes1 + inplanes2
+        if stride == 2:
+            self.deconv1 = Deconv3x3x3(inplanes1, inplanes1//2)
+            inplanes3 = inplanes1//2 + inplanes2
+        self.stride = stride
+        # elif inplanes1 != planes:
+            # self.deconv1 = nn.Conv3d(inplanes1, planes, kernel_size=1, stride=1)
+        # self.conv1x1x1 = nn.Conv3d(inplanes2, planes, kernel_size=1, stride=1)#, padding=1)
+        self.conv1 = conv3x3x3(inplanes3, planes)#, stride)
+        self.bn1 = nn.BatchNorm3d(planes)
+        self.relu = nn.LeakyReLU(inplace=True)
+        self.conv2 = conv3x3x3(planes, planes)
+        self.bn2 = nn.BatchNorm3d(planes)
+        if inplanes3 != planes:
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes3, planes, kernel_size=3, stride=1, padding=1, bias=False),
+                                            nn.BatchNorm3d(planes))
+        else:
+            self.downsample = lambda x: x
+        self.stride = stride
+    def forward(self, x1, x2):
+#         print(x1.size(), x2.size())
+        if self.stride == 2: x1 = self.deconv1(x1)
+        #print(self.stride, x1.size(), x2.size())
+        out = t.cat([x1, x2], dim=1)
+        residual = self.downsample(out)
+        #print(out.size(), residual.size())
+        out = self.conv1(out)
+        out = self.bn1(out)
+        out = self.relu(out)
+
+        out = self.conv2(out)
+        out = self.bn2(out)
+
+        out += residual
+        out = self.relu(out)
+        return out
+class ResNetUNET3D(nn.Module):
+    def __init__(self, block, upblock, upblock1, n_size, num_classes=2, in_channel=1): # BasicBlock, 3
+        super(ResNetUNET3D, self).__init__()
+        self.inplane = 28
+        self.conv1 = nn.Conv3d(in_channel, self.inplane, kernel_size=3, stride=2, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm3d(self.inplane)
+        self.relu = nn.LeakyReLU(inplace=True)
+        self.layer1 = self._make_layer(block, 30, blocks=n_size, stride=1)
+        self.layer2 = self._make_layer(block, 32, blocks=n_size, stride=1)
+        self.layer3 = self._make_layer(block, 34, blocks=n_size, stride=1)
+        self.layer4 = upblock(34, 32, 32, stride=1)
+        self.inplane = 32
+        self.layer5 = self._make_layer(block, 32, blocks=n_size-1, stride=1)
+        self.layer6 = upblock(32, 30, 30, stride=1)
+        self.inplane = 30
+        self.layer7 = self._make_layer(block, 30, blocks=n_size-1, stride=1)
+        self.layer8 = upblock(30, 28, 28, stride=1)
+        self.inplane = 28
+        self.layer9 = self._make_layer(block, 28, blocks=n_size-1, stride=1)
+        self.inplane = 28
+        self.layer10 = upblock1(28, 1, 14, stride=2)
+        self.layer11 = nn.Sequential(#nn.Conv3d(16, 14, kernel_size=3, stride=1, padding=1, bias=True),
+                                     #nn.ReLU(inplace=True),
+                                     nn.Conv3d(14, num_classes, kernel_size=3, stride=1, padding=1, bias=True))
+#         self.outconv = nn.ConvTranspose3d(self.inplane, num_classes, 2, stride=2)
+        self.initialize()
+    def initialize(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv3d):
+                nn.init.kaiming_normal_(m.weight)
+            elif isinstance(m, nn.BatchNorm3d):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
+            elif isinstance(m, nn.ConvTranspose3d):
+                nn.init.kaiming_normal_(m.weight)
+    def _make_layer(self, block, planes, blocks, stride):
+        strides = [stride] + [1] * (blocks - 1)
+        layers = []
+        for stride in strides:
+            layers.append(block(self.inplane, planes, stride))
+            self.inplane = planes
+        return nn.Sequential(*layers)
+    def forward(self, x0):
+        x = self.conv1(x0) # 16 1/2 
+        x = self.bn1(x)
+        x1 = self.relu(x)
+
+        x2 = self.layer1(x1) # 16 1/4 16 1/4 res 16 1/4 - 16 1/4 16 1/4 res 16 1/4 - 16 1/4 16 1/4 res 16 1/4
+        x3 = self.layer2(x2) # 32 1/8 32 1/8 res 32 1/8 - 32 1/8 32 1/8 res 32 1/8 - 32 1/8 32 1/8 res 32 1/8
+        x4 = self.layer3(x3) # 64 1/16 64 1/16 res 64 1/16 - 64 1/16 64 1/16 res 64 1/16 - 64 1/16 64 1/16 res 64 1/16
+#         print('x4', x4.size())
+        x5 = self.layer4(x4, x3) # 16 1/8 48 1/8 32 1/8 32 1/8 res 32 1/8 - 32 1/8 32 1/8 res 32 1/8 - 32 1/8 32 1/8 res 32 1/8
+        x5 = self.layer5(x5)
+        x6 = self.layer6(x5, x2) # 8 1/4 24 1/4 16 1/4 16 1/4 res 16 1/4 - 16 1/4 16 1/4 res 16 1/4 - 16 1/4 16 1/4 res 16 1/4
+        x6 = self.layer7(x6)
+        x7 = self.layer8(x6, x1) # 4 1/2 20 1/2 16 1/2 16 1/2 res 16 1/2 - 16 1/2 16 1/2 res 16 1/2 - 16 1/2 16 1/2 res 16 1/2
+        x7 = self.layer9(x7)
+        x8 = self.layer10(x7, x0)
+        x9 = self.layer11(x8)
+#         print(x0.size(), x.size(), x1.size(), x2.size(), x3.size(), x4.size(), x5.size(), x6.size(), \
+#               x7.size(), x8.size(), x9.size())
+        return F.softmax(x9, dim=1)
+#         out = self.outconv(x7)
+#         return F.softmax(out, dim=1)
 # Ref: salehi17, "Twersky loss function for image segmentation using 3D FCDN"
 # -> the score is computed for each class separately and then summed
 # alpha=beta=0.5 : dice coefficient
@@ -425,51 +523,6 @@ def tversky_loss_wmask(y_pred, y_true, flagvec):
 #     Ncl = y_pred.size(1)*1.0
 #     print(Ncl, T)
     return t.sum(flagvec.cuda())-T
-
-def generaldiceloss_wmask(y_pred, y_true, flagvec): # (torch.Size([1, 10, 104, 152, 120]), torch.Size([1, 10, 104, 152, 120]))
-    # MLMI17 Generalised Dice overlap as a deep learning loss function for highly unbalanced segmentations
-#     print(y_pred.size(), y_true.size())
-    batch_size = y_true.size(0)
-    ncls = y_true.size(1)#.type(t.cuda.FloatTensor)
-#     output = y_pred.view(-1, ncls)
-#     labels = y_true.view(-1, ncls)
-    rp = t.sum(t.sum(t.sum(t.sum(y_pred * y_true.type(t.cuda.FloatTensor),4),3),2),0) # cls
-    wl = t.sum(t.sum(t.sum(t.sum(y_true.type(t.cuda.FloatTensor),4),3),2),0) # cls
-    wl = 1.0 / (wl * wl + 1e-5)
-    r_p = t.sum(t.sum(t.sum(t.sum(y_pred + y_true.type(t.cuda.FloatTensor),4),3),2),0) # cls
-    return 1 - 2 * t.sum(wl * rp* flagvec.cuda()) / t.sum(wl * r_p + 1e-5)
-
-def fdl_loss_wmask(y_pred, y_true, flagvec):
-    alpha = 0.5
-    beta  = 0.5
-    ones = t.ones_like(y_pred) #K.ones(K.shape(y_true))
-#     print(type(ones.data), type(y_true.data), type(y_pred.data), ones.size(), y_pred.size())
-    p0 = y_pred      # proba that voxels are class i
-    p1 = ones-y_pred # proba that voxels are not class i
-    g0 = y_true.type(t.cuda.FloatTensor)
-    g1 = ones-g0
-    num = t.sum(t.sum(t.sum(t.sum(p0*g0*t.pow(1-p0,2), 4),3),2),0) #(0,2,3,4)) #K.sum(p0*g0, (0,1,2,3))
-    den = num + alpha*t.sum(t.sum(t.sum(t.sum(p0*g1,4),3),2),0) + beta*t.sum(t.sum(t.sum(t.sum(p1*g0,4),3),2),0) #(0,2,3,4))
-
-    T = t.sum(((num * flagvec.cuda())/(den+1e-5)))# * t.pow(1-num/(t.sum(t.sum(t.sum(t.sum(g0,4),3),2),0)+1e-5),2))
-#     Ncl = y_pred.size(1)*1.0
-#     print(Ncl, T)
-    return 1.6 * (t.sum(flagvec.cuda())- T) #Ncl-T
-
-def explogdice_wmask(y_pred, y_true, flagvec):
-    alpha = 0.5
-    beta  = 0.5
-    ones = t.ones_like(y_pred) #K.ones(K.shape(y_true))
-#     print(type(ones.data), type(y_true.data), type(y_pred.data), ones.size(), y_pred.size())
-    p0 = y_pred      # proba that voxels are class i
-    p1 = ones-y_pred # proba that voxels are not class i
-    g0 = y_true.type(t.cuda.FloatTensor)
-    g1 = ones-g0
-    num = t.sum(t.sum(t.sum(t.sum(p0*g0, 4),3),2),0) #(0,2,3,4)) #K.sum(p0*g0, (0,1,2,3))
-    den = num + alpha*t.sum(t.sum(t.sum(t.sum(p0*g1,4),3),2),0) + beta*t.sum(t.sum(t.sum(t.sum(p1*g0,4),3),2),0)
-    return t.sum(t.pow(-t.log(t.clamp(num/(den+1e-5), 1e-5, 1-1e-5)), 0.3) * flagvec.cuda()) / (t.clamp(t.sum(flagvec.cuda()), 1e-5, 1000))
-#     return t.sum(t.pow(-t.log(t.clamp(num/denom, 1e-5, 1)), 0.3) * flagvec.cuda())/(t.clamp(t.sum((flagvec.cuda()!=0)), 1e-5, 1000)).type(t.cuda.FloatTensor)
-
 def caldice(y_pred, y_true):
 #     print(y_pred.sum(), y_true.sum())
     y_pred = y_pred.data.cpu().numpy().transpose(1,0,2,3,4) # inference should be arg max
@@ -524,21 +577,25 @@ def caldice(y_pred, y_true):
         if dice != -1:
             assert 0 <= dice <= 1
     return avgdice
-model = UNet(1,9+1).cuda()
+model = ResNetUNET3D(SEBasicBlock3D, UpSEBasicBlock3D, UpBasicBlock3D, 2, num_classes=9+1, in_channel=1).cuda() 
 lossweight = np.array([2.22, 1.31, 1.99, 1.13, 1.93, 1.93, 1.0, 1.0, 1.90, 1.98], np.float32)
-savename = './model/unet10pool1e2e_pet_wmask_rmsp_'
+pretraind_dict = t.load('./model/unet10pool3e2e_seres18_conc_pet_wmask_2_rmsp_1')["weight"]
+model_dict = model.state_dict()
+pretraind_dict = {k: v for k, v in pretraind_dict.items() if k in model_dict}
+model_dict.update(pretraind_dict)
+model.load_state_dict(pretraind_dict)
+savename = './model/unet10pool3e2e_seres18_conc_pet_wmask_2_rmsp_lru_1_'
 
 
 # In[5]:
 
 
-optimizer = t.optim.RMSprop(model.parameters(),lr = 2e-3)
+optimizer = t.optim.RMSprop(model.parameters(),lr = 5e-4)
 maxloss = [0 for _ in range(9)]
 for epoch in range(150):
     tq = tqdm(traindataloader, desc='loss', leave=True)
     trainloss = 0
     for x_train, y_train, flagvec in tq:
-#         print(x_train.size(), y_train.size(), flagvec.size())
         x_train = t.autograd.Variable(x_train.cuda())
         y_train = t.autograd.Variable(y_train.cuda())
         optimizer.zero_grad()
@@ -567,7 +624,10 @@ for epoch in range(150):
     for cls in range(9):
         if maxloss[cls] < testloss[cls]:
             maxloss[cls] = testloss[cls]
-            t.save(model, savename+str(cls+1))
+            state = {"epoch": epoch, "weight": model.state_dict()}
+            t.save(state, savename+str(cls+1))
+#             model.load_state_dict(t.load(savename)["weight"])
+#             t.save(model, savename+str(cls+1))
     print('epoch %i TRAIN loss %.4f' % (epoch, trainloss/len(tq)))
     print('test loss %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f' % tuple(testloss))
     print('best test loss %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f' % tuple(maxloss))
@@ -591,10 +651,10 @@ for epoch in range(150):
         print('train loss %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f' % tuple(testloss))
 
 
-# In[ ]:
+# In[6]:
 
 
-optimizer = t.optim.SGD(model.parameters(), 1e-3, momentum = 0.9)#, weight_decay = 1e-4)
+optimizer = t.optim.SGD(model.parameters(), 1e-4, momentum = 0.9)#, weight_decay = 1e-4)
 for epoch in range(50):
     tq = tqdm(traindataloader, desc='loss', leave=True)
     trainloss = 0
@@ -627,7 +687,10 @@ for epoch in range(50):
     for cls in range(9):
         if maxloss[cls] < testloss[cls]:
             maxloss[cls] = testloss[cls]
-            t.save(model, savename+str(cls+1))
+            state = {"epoch": epoch, "weight": model.state_dict()}
+            t.save(state, savename+str(cls+1))
+#             model.load_state_dict(t.load(savename)["weight"])
+#             t.save(model, savename+str(cls+1))
     print('epoch %i TRAIN loss %.4f' % (epoch, trainloss/len(tq)))
     print('test loss %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f' % tuple(testloss))
     print('best test loss %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f' % tuple(maxloss))
@@ -649,3 +712,5 @@ for epoch in range(50):
             del x_test, y_test, o
         testloss = [l / n for l,n in zip(testloss, ntest)]
         print('train loss %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f' % tuple(testloss))
+
+

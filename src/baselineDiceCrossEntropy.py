@@ -40,7 +40,7 @@ TRAIN_PATH = './data/trainpddca15_crp_v2_pool1.pth'
 TEST_PATH = './data/testpddca15_crp_v2_pool1.pth'
 CET_PATH = './data/trainpddca15_cet_crp_v2_pool1.pth'
 PET_PATH = './data/trainpddca15_pet_crp_v2_pool1.pth'
-os.environ["CUDA_VISIBLE_DEVICES"]="7"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 
 # In[2]:
@@ -402,6 +402,9 @@ class UNet(nn.Module):
         outx = F.softmax(outx, dim=1)
 #         print(outx.size())
         return outx
+def crossentropy(y_pred, y_true, flagvec):
+    retv = - t.sum(t.sum(t.sum(t.sum(t.log(t.clamp(y_pred,1e-6,1))*y_true.type(t.cuda.FloatTensor),4),3),2),0) * flagvec.cuda() 
+    return t.sum(retv / (t.sum(t.sum(t.sum(t.sum(y_true.type(t.cuda.FloatTensor),4),3),2),0) + 1e-6)) / y_true.size()[1]
 # Ref: salehi17, "Twersky loss function for image segmentation using 3D FCDN"
 # -> the score is computed for each class separately and then summed
 # alpha=beta=0.5 : dice coefficient
@@ -526,7 +529,8 @@ def caldice(y_pred, y_true):
     return avgdice
 model = UNet(1,9+1).cuda()
 lossweight = np.array([2.22, 1.31, 1.99, 1.13, 1.93, 1.93, 1.0, 1.0, 1.90, 1.98], np.float32)
-savename = './model/unet10pool1e2e_pet_wmask_rmsp_'
+ceweight = 0.1
+savename = './model/unet10pool1e2e_pet_wmask_'+str(ceweight)+'dce_rmsp_'
 
 
 # In[5]:
@@ -534,7 +538,7 @@ savename = './model/unet10pool1e2e_pet_wmask_rmsp_'
 
 optimizer = t.optim.RMSprop(model.parameters(),lr = 2e-3)
 maxloss = [0 for _ in range(9)]
-for epoch in range(150):
+for epoch in range(0):#150):
     tq = tqdm(traindataloader, desc='loss', leave=True)
     trainloss = 0
     for x_train, y_train, flagvec in tq:
@@ -544,7 +548,8 @@ for epoch in range(150):
         optimizer.zero_grad()
         o = model(x_train)
         loss = tversky_loss_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
-        loss.backward()
+        celoss = crossentropy(o, y_train, flagvec*t.from_numpy(lossweight))
+        (loss+celoss*ceweight).backward()
         optimizer.step()
         tq.set_description("epoch %i loss %f" % (epoch, loss.item()))
         tq.refresh() # to show immediately the update
@@ -593,7 +598,9 @@ for epoch in range(150):
 
 # In[ ]:
 
-
+model = t.load(savename+str(2+1))
+maxloss = [85.19, 48.76, 90.95, 69.63, 67.44, 87.98, 86.92, 77.79, 78.44]
+print(maxloss)
 optimizer = t.optim.SGD(model.parameters(), 1e-3, momentum = 0.9)#, weight_decay = 1e-4)
 for epoch in range(50):
     tq = tqdm(traindataloader, desc='loss', leave=True)
@@ -604,9 +611,10 @@ for epoch in range(50):
         optimizer.zero_grad()
         o = model(x_train)
         loss = tversky_loss_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
-        loss.backward()
+        celoss = crossentropy(o, y_train, flagvec*t.from_numpy(lossweight))
+        (loss+celoss*ceweight).backward()
         optimizer.step()
-        tq.set_description("epoch %i loss %f" % (epoch, loss.item()))
+        tq.set_description("epoch %i loss %f" % (epoch, celoss.item()))
         tq.refresh() # to show immediately the update
         trainloss += loss.item()
         del loss, x_train, y_train, o

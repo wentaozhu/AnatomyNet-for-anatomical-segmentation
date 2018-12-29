@@ -40,7 +40,7 @@ TRAIN_PATH = './data/trainpddca15_crp_v2_pool1.pth'
 TEST_PATH = './data/testpddca15_crp_v2_pool1.pth'
 CET_PATH = './data/trainpddca15_cet_crp_v2_pool1.pth'
 PET_PATH = './data/trainpddca15_pet_crp_v2_pool1.pth'
-os.environ["CUDA_VISIBLE_DEVICES"]="7"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 
 
 # In[2]:
@@ -451,7 +451,7 @@ def fdl_loss_wmask(y_pred, y_true, flagvec):
     num = t.sum(t.sum(t.sum(t.sum(p0*g0*t.pow(1-p0,2), 4),3),2),0) #(0,2,3,4)) #K.sum(p0*g0, (0,1,2,3))
     den = num + alpha*t.sum(t.sum(t.sum(t.sum(p0*g1,4),3),2),0) + beta*t.sum(t.sum(t.sum(t.sum(p1*g0,4),3),2),0) #(0,2,3,4))
 
-    T = t.sum(((num * flagvec.cuda())/(den+1e-5)))# * t.pow(1-num/(t.sum(t.sum(t.sum(t.sum(g0,4),3),2),0)+1e-5),2))
+    T = t.sum(((num * flagvec.cuda())/(den+1e-6)))# * t.pow(1-num/(t.sum(t.sum(t.sum(t.sum(g0,4),3),2),0)+1e-5),2))
 #     Ncl = y_pred.size(1)*1.0
 #     print(Ncl, T)
     return 1.6 * (t.sum(flagvec.cuda())- T) #Ncl-T
@@ -526,7 +526,7 @@ def caldice(y_pred, y_true):
     return avgdice
 model = UNet(1,9+1).cuda()
 lossweight = np.array([2.22, 1.31, 1.99, 1.13, 1.93, 1.93, 1.0, 1.0, 1.90, 1.98], np.float32)
-savename = './model/unet10pool1e2e_pet_wmask_rmsp_'
+savename = './model/unet10pool1e2e_pet_wmask_fdl_rmsp_'
 
 
 # In[5]:
@@ -543,7 +543,7 @@ for epoch in range(150):
         y_train = t.autograd.Variable(y_train.cuda())
         optimizer.zero_grad()
         o = model(x_train)
-        loss = tversky_loss_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
+        loss = fdl_loss_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
         loss.backward()
         optimizer.step()
         tq.set_description("epoch %i loss %f" % (epoch, loss.item()))
@@ -603,7 +603,7 @@ for epoch in range(50):
         y_train = t.autograd.Variable(y_train.cuda())
         optimizer.zero_grad()
         o = model(x_train)
-        loss = tversky_loss_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
+        loss = fdl_loss_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
         loss.backward()
         optimizer.step()
         tq.set_description("epoch %i loss %f" % (epoch, loss.item()))

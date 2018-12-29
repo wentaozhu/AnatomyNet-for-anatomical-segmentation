@@ -40,7 +40,7 @@ TRAIN_PATH = './data/trainpddca15_crp_v2_pool1.pth'
 TEST_PATH = './data/testpddca15_crp_v2_pool1.pth'
 CET_PATH = './data/trainpddca15_cet_crp_v2_pool1.pth'
 PET_PATH = './data/trainpddca15_pet_crp_v2_pool1.pth'
-os.environ["CUDA_VISIBLE_DEVICES"]="7"
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 
 
 # In[2]:
@@ -467,7 +467,7 @@ def explogdice_wmask(y_pred, y_true, flagvec):
     g1 = ones-g0
     num = t.sum(t.sum(t.sum(t.sum(p0*g0, 4),3),2),0) #(0,2,3,4)) #K.sum(p0*g0, (0,1,2,3))
     den = num + alpha*t.sum(t.sum(t.sum(t.sum(p0*g1,4),3),2),0) + beta*t.sum(t.sum(t.sum(t.sum(p1*g0,4),3),2),0)
-    return t.sum(t.pow(-t.log(t.clamp(num/(den+1e-5), 1e-5, 1-1e-5)), 0.3) * flagvec.cuda()) / (t.clamp(t.sum(flagvec.cuda()), 1e-5, 1000))
+    return t.sum(t.pow(-t.log(t.clamp(num/(den+1e-6), 1e-6, 1-1e-6)), 0.3) * flagvec.cuda()) / (t.clamp(t.sum(flagvec.cuda()), 1e-6, 1000))
 #     return t.sum(t.pow(-t.log(t.clamp(num/denom, 1e-5, 1)), 0.3) * flagvec.cuda())/(t.clamp(t.sum((flagvec.cuda()!=0)), 1e-5, 1000)).type(t.cuda.FloatTensor)
 
 def caldice(y_pred, y_true):
@@ -526,7 +526,7 @@ def caldice(y_pred, y_true):
     return avgdice
 model = UNet(1,9+1).cuda()
 lossweight = np.array([2.22, 1.31, 1.99, 1.13, 1.93, 1.93, 1.0, 1.0, 1.90, 1.98], np.float32)
-savename = './model/unet10pool1e2e_pet_wmask_rmsp_'
+savename = './model/unet10pool1e2e_pet_wmask_rmsp_explog'
 
 
 # In[5]:
@@ -543,7 +543,7 @@ for epoch in range(150):
         y_train = t.autograd.Variable(y_train.cuda())
         optimizer.zero_grad()
         o = model(x_train)
-        loss = tversky_loss_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
+        loss = explogdice_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
         loss.backward()
         optimizer.step()
         tq.set_description("epoch %i loss %f" % (epoch, loss.item()))
@@ -603,7 +603,7 @@ for epoch in range(50):
         y_train = t.autograd.Variable(y_train.cuda())
         optimizer.zero_grad()
         o = model(x_train)
-        loss = tversky_loss_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
+        loss = explogdice_wmask(o, y_train, flagvec*t.from_numpy(lossweight))
         loss.backward()
         optimizer.step()
         tq.set_description("epoch %i loss %f" % (epoch, loss.item()))
