@@ -6,7 +6,7 @@ Use PDDCA18 (MICCAI) training + HNPETCT + HNCetuximab as training set. Use PDDCA
 
 The data spliting is in https://www.google.com/search?q=PDDCA+dataset&oq=PDDCA+dataset&aqs=chrome..69i57j0l5.3910j0j7&sourceid=chrome&ie=UTF-8
 
-./data/*.csv files are used to remove non-head and neck regions.
+./data/*.csv files are used to remove non-head and neck regions. Processed PDDCA, PETCT and CET datasets can be downloaded from https://drive.google.com/open?id=1yTarwj5_rp7eX2gCm5k8R0RsZVGzdYlc https://drive.google.com/open?id=1XbsHVVtap72qp11Pv2cUzbV3dosOjBos https://drive.google.com/file/d/1XbsHVVtap72qp11Pv2cUzbV3dosOjBos/view?usp=sharing
 
 For the files in ./src/, please read the paper for details.
 
