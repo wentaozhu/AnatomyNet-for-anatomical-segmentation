@@ -287,13 +287,13 @@ class BasicBlock3D(nn.Module):
     def __init__(self, inplanes, planes, stride=1):
         super(BasicBlock3D, self).__init__()
         self.conv1 = conv3x3x3(inplanes, planes, stride)
-        self.bn1 = nn.BatchNorm3d(planes)
+        #self.bn1 = nn.BatchNorm3d(planes)
         self.relu = nn.ReLU(inplace=True)
         self.conv2 = conv3x3x3(planes, planes)
-        self.bn2 = nn.BatchNorm3d(planes)
+        #self.bn2 = nn.BatchNorm3d(planes)
         if inplanes != planes:
-            self.downsample = nn.Sequential(nn.Conv3d(inplanes, planes, kernel_size=1, stride=stride, bias=False),
-                                            nn.BatchNorm3d(planes))
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes, planes, kernel_size=1, stride=stride, bias=False))#,
+                                            #nn.BatchNorm3d(planes))
         else:
             self.downsample = lambda x: x
         self.stride = stride       
@@ -330,8 +330,8 @@ class UpBasicBlock3D(nn.Module):
         self.conv2 = conv3x3x3(planes, planes)
         self.bn2 = nn.BatchNorm3d(planes)
         if inplanes3 != planes:
-            self.downsample = nn.Sequential(nn.Conv3d(inplanes3, planes, kernel_size=3, stride=1, padding=1, bias=False),
-                                            nn.BatchNorm3d(planes))
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes3, planes, kernel_size=3, stride=1, padding=1, bias=False))#,
+                                            #nn.BatchNorm3d(planes))
         else:
             self.downsample = lambda x: x
         self.stride = stride
@@ -343,11 +343,11 @@ class UpBasicBlock3D(nn.Module):
         residual = self.downsample(out)
         #print(out.size(), residual.size())
         out = self.conv1(out)
-        out = self.bn1(out)
+        #out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
-        out = self.bn2(out)
+        #out = self.bn2(out)
 
         out += residual
         out = self.relu(out)
@@ -396,7 +396,7 @@ class ResNetUNET3D(nn.Module):
         return nn.Sequential(*layers)
     def forward(self, x0):
         x = self.conv1(x0) # 16 1/2 
-        x = self.bn1(x)
+        #x = self.bn1(x)
         x1 = self.relu(x)
 
         x2 = self.layer1(x1) # 16 1/4 16 1/4 res 16 1/4 - 16 1/4 16 1/4 res 16 1/4 - 16 1/4 16 1/4 res 16 1/4
