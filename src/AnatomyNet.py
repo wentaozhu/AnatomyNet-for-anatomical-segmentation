@@ -300,11 +300,11 @@ class BasicBlock3D(nn.Module):
 #         print(x.size())
         residual = self.downsample(x)
         out = self.conv1(x)
-        out = self.bn1(out)
+        #out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
-        out = self.bn2(out)
+        #out = self.bn2(out)
 #         print(x.size(), residual.size(), out.size())
         out += residual
         out = self.relu(out)
@@ -338,19 +338,19 @@ class SEBasicBlock3D(nn.Module):
         self.bn2 = nn.BatchNorm3d(planes)
         self.se = SELayer3D(planes, reduction)
         if inplanes != planes:
-            self.downsample = nn.Sequential(nn.Conv3d(inplanes, planes, kernel_size=1, stride=stride, bias=False),
-                                            nn.BatchNorm3d(planes))
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes, planes, kernel_size=1, stride=stride, bias=False))#,
+                                            #nn.BatchNorm3d(planes))
         else:
             self.downsample = lambda x: x
         self.stride = stride
     def forward(self, x):
         residual = x
         out = self.conv1(x)
-        out = self.bn1(out)
+        #out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
-        out = self.bn2(out)
+        #out = self.bn2(out)
         out = self.se(out)
 #         if self.downsample is not None:
         residual = self.downsample(x)
@@ -373,8 +373,8 @@ class UpSEBasicBlock3D(nn.Module):
         self.bn2 = nn.BatchNorm3d(planes)
         self.se = SELayer3D(planes, reduction)
         if inplanes3 != planes:
-            self.downsample = nn.Sequential(nn.Conv3d(inplanes3, planes, kernel_size=1, stride=stride, bias=False),
-                                            nn.BatchNorm3d(planes))
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes3, planes, kernel_size=1, stride=stride, bias=False))#,
+                                            #nn.BatchNorm3d(planes))
         else:
             self.downsample = lambda x: x
         self.stride = stride
@@ -387,11 +387,11 @@ class UpSEBasicBlock3D(nn.Module):
         residual = self.downsample(out)
         #print(residual.size(), x1.size(), x2.size())
         out = self.conv1(out)
-        out = self.bn1(out)
+        #out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
-        out = self.bn2(out)
+        #out = self.bn2(out)
         out = self.se(out)
         #print(out.size(), residual.size())
         out += residual
@@ -427,11 +427,11 @@ class UpBasicBlock3D(nn.Module):
         residual = self.downsample(out)
         #print(out.size(), residual.size())
         out = self.conv1(out)
-        out = self.bn1(out)
+        #out = self.bn1(out)
         out = self.relu(out)
 
         out = self.conv2(out)
-        out = self.bn2(out)
+        #out = self.bn2(out)
 
         out += residual
         out = self.relu(out)
@@ -480,7 +480,7 @@ class ResNetUNET3D(nn.Module):
         return nn.Sequential(*layers)
     def forward(self, x0):
         x = self.conv1(x0) # 16 1/2 
-        x = self.bn1(x)
+        #x = self.bn1(x)
         x1 = self.relu(x)
 
         x2 = self.layer1(x1) # 16 1/4 16 1/4 res 16 1/4 - 16 1/4 16 1/4 res 16 1/4 - 16 1/4 16 1/4 res 16 1/4
