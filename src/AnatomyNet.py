@@ -338,7 +338,7 @@ class SEBasicBlock3D(nn.Module):
         self.bn2 = nn.BatchNorm3d(planes)
         self.se = SELayer3D(planes, reduction)
         if inplanes != planes:
-            self.downsample = nn.Sequential(nn.Conv3d(inplanes, planes, kernel_size=1, stride=stride, bias=False)),
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes, planes, kernel_size=1, stride=stride, bias=False),
                                             nn.BatchNorm3d(planes))
         else:
             self.downsample = lambda x: x
@@ -373,7 +373,7 @@ class UpSEBasicBlock3D(nn.Module):
         self.bn2 = nn.BatchNorm3d(planes)
         self.se = SELayer3D(planes, reduction)
         if inplanes3 != planes:
-            self.downsample = nn.Sequential(nn.Conv3d(inplanes3, planes, kernel_size=1, stride=stride, bias=False)),
+            self.downsample = nn.Sequential(nn.Conv3d(inplanes3, planes, kernel_size=1, stride=stride, bias=False),
                                             nn.BatchNorm3d(planes))
         else:
             self.downsample = lambda x: x
