@@ -300,17 +300,17 @@ class double_conv(nn.Module):
         if bias:
             self.conv = nn.Sequential(
                 nn.Conv3d(in_ch, out_ch, 3, padding=1, stride=stride, bias=True),
-                #nn.BatchNorm3d(out_ch),
+                nn.BatchNorm3d(out_ch),
                 nn.ReLU(inplace=True),
                 nn.Conv3d(in_ch2, out_ch2, 3, padding=1, bias=True),
             )
         else:
             self.conv = nn.Sequential(
                 nn.Conv3d(in_ch, out_ch, 3, padding=1, stride=stride, bias=False),
-                #nn.BatchNorm3d(out_ch),
+                nn.BatchNorm3d(out_ch),
                 nn.ReLU(inplace=True),
                 nn.Conv3d(out_ch2, out_ch2, 3, padding=1, bias=False),
-                #nn.BatchNorm3d(out_ch),
+                nn.BatchNorm3d(out_ch),
                 nn.ReLU(inplace=True)
             )
     def forward(self, x):
