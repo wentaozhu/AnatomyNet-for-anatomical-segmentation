@@ -523,6 +523,13 @@ def tversky_loss_wmask(y_pred, y_true, flagvec):
 #     Ncl = y_pred.size(1)*1.0
 #     print(Ncl, T)
     return t.sum(flagvec.cuda())-T
+
+
+def focal(y_pred, y_true, flagvec):
+    retv = - t.sum(t.sum(t.sum(t.sum(t.log(t.clamp(y_pred,1e-6,1))*y_true.type(t.cuda.FloatTensor)*t.pow(1-y_pred,2),4),3),2),0) 
+        * flagvec.cuda() 
+
+
 def caldice(y_pred, y_true):
 #     print(y_pred.sum(), y_true.sum())
     y_pred = y_pred.data.cpu().numpy().transpose(1,0,2,3,4) # inference should be arg max
