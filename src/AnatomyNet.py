@@ -34,7 +34,7 @@ import torch as t
 # t.backends.cudnn.benchmark = True
 t.backends.cudnn.enabled = True
 from torch.utils import data
-from torchvision import transforms as tsf
+# from torchvision import transforms as tsf
 
 TRAIN_PATH = './data/trainpddca15_crp_v2_pool1.pth'
 TEST_PATH = './data/testpddca15_crp_v2_pool1.pth'
@@ -526,7 +526,7 @@ def tversky_loss_wmask(y_pred, y_true, flagvec):
 
 
 def focal(y_pred, y_true, flagvec):
-    retv = - t.sum(t.sum(t.sum(t.sum(t.log(t.clamp(y_pred,1e-6,1))*y_true.type(t.cuda.FloatTensor)*t.pow(1-y_pred,2),4),3),2),0) 
+    retv = - t.sum(t.sum(t.sum(t.sum(t.log(t.clamp(y_pred,1e-6,1))*y_true.type(t.cuda.FloatTensor)*t.pow(1-y_pred,2),4),3),2),0)\
         * flagvec.cuda() 
 
 
@@ -586,11 +586,11 @@ def caldice(y_pred, y_true):
     return avgdice
 model = ResNetUNET3D(SEBasicBlock3D, UpSEBasicBlock3D, UpBasicBlock3D, 2, num_classes=9+1, in_channel=1).cuda() 
 lossweight = np.array([2.22, 1.31, 1.99, 1.13, 1.93, 1.93, 1.0, 1.0, 1.90, 1.98], np.float32)
-pretraind_dict = t.load('./model/unet10pool3e2e_seres18_conc_pet_wmask_2_rmsp_1')["weight"]
-model_dict = model.state_dict()
-pretraind_dict = {k: v for k, v in pretraind_dict.items() if k in model_dict}
-model_dict.update(pretraind_dict)
-model.load_state_dict(pretraind_dict)
+# pretraind_dict = t.load('./model/unet10pool3e2e_seres18_conc_pet_wmask_2_rmsp_1')["weight"]
+# model_dict = model.state_dict()
+# pretraind_dict = {k: v for k, v in pretraind_dict.items() if k in model_dict}
+# model_dict.update(pretraind_dict)
+# model.load_state_dict(pretraind_dict)
 savename = './model/unet10pool3e2e_seres18_conc_pet_wmask_2_rmsp_lru_1_'
 
 
