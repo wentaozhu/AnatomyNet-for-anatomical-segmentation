@@ -528,7 +528,7 @@ def tversky_loss_wmask(y_pred, y_true, flagvec):
 def focal(y_pred, y_true, flagvec):
     retv = - t.mean(t.mean(t.mean(t.mean(t.log(t.clamp(y_pred,1e-6,1))*y_true.type(t.cuda.FloatTensor)*t.pow(1-y_pred,2),4),3),2),0)\
         * flagvec.cuda()
-    return retv
+    return t.sum(retv)
 
 
 def caldice(y_pred, y_true):
